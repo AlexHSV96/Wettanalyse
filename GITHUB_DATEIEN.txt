@@ -1,0 +1,104 @@
+📦 WM ANALYZER - DATEIEN FÜR GITHUB UPLOAD
+==========================================
+
+✅ DIESE DATEIEN UPLOADEST DU ZU GITHUB:
+
+1. ✓ server.js
+   - Dein Node.js Backend
+   - API Endpoints
+   - Macht alle Server-Logik
+
+2. ✓ package.json
+   - Installiert Dependencies (express, axios, etc.)
+   - npm install liest diese Datei
+
+3. ✓ .env.example
+   - Template mit der Struktur
+   - Zeigt welche Keys nötig sind
+   - KEINE echten Keys drin!
+
+4. ✓ wm-analyzer-with-backend.html
+   - Dein Frontend (die Seite im Browser)
+   - Verbindet sich mit dem Backend
+
+5. ✓ README.md
+   - Dokumentation für andere
+   - Installation, Features, etc.
+
+6. ✓ .gitignore
+   - Sagt GitHub welche Dateien ignorieren
+   - WICHTIG: .env Datei wird ignoriert!
+
+7. ✓ SETUP.md (optional)
+   - Detaillierte Setup-Anleitung
+
+==========================================
+
+❌ DIESE DATEIEN UPLOADEST DU NICHT:
+
+- .env (deine privaten Keys!)
+  → Wird durch .gitignore geschützt
+
+- node_modules/ (wird später mit npm install erstellt)
+  → Wird durch .gitignore ignoriert
+
+- .DS_Store, Thumbs.db (System-Dateien)
+  → Werden durch .gitignore ignoriert
+
+==========================================
+
+📋 UPLOAD-REIHENFOLGE BEI GITHUB:
+
+1. Neue Repository erstellen: "wm-analyzer"
+2. "Add file" → "Upload files" klicken
+3. Diese Dateien hochladen:
+   ✓ server.js
+   ✓ package.json
+   ✓ .env.example
+   ✓ .gitignore
+   ✓ wm-analyzer-with-backend.html
+   ✓ README.md
+   ✓ SETUP.md
+
+4. "Commit changes" klicken
+
+FERTIG! 🚀
+
+==========================================
+
+🔑 WAS IST MIT MEINEN KEYS?
+
+LOKAL auf deinem PC:
+- Erstelle .env Datei (Kopie von .env.example)
+- Trage deine echten Keys ein
+- Speichern (nicht zu GitHub!)
+
+BEI VERCEL DEPLOYMENT:
+- .env NICHT hochladen
+- Keys in Vercel Web-Interface eingeben
+- "Environment Variables" Section
+
+SICHERHEIT:
+✓ .env.example → public (keine Keys)
+✗ .env → private (mit Keys)
+✓ .gitignore → schützt deine .env
+
+==========================================
+
+🎯 QUICK START FÜR GITHUB:
+
+1. https://github.com öffnen
+2. Sign up / Login
+3. "New Repository"
+4. Name: "wm-analyzer"
+5. Public wählen
+6. "Add a README file" nicht ankreuzen
+7. .gitignore: Node wählen
+8. Create
+9. "Add file" → "Upload files"
+10. Deine 6-7 Dateien hochladen
+11. "Commit changes"
+
+DONE! ✓
+
+==========================================
