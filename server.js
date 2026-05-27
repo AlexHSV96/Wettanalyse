@@ -1,9 +1,7 @@
-// server.js - WM Wett-Analyzer Backend für Vercel
+// server.js - WM Wett-Analyzer All-in-One für Vercel
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const path = require('path');
-const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -12,11 +10,527 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Serve statische Dateien
-app.use(express.static(path.join(__dirname)));
-
 const FOOTBALL_DATA_KEY = process.env.FOOTBALL_DATA_KEY || '6a01d9c5b7ea430b8058c58f4d7ac92c';
 const ODDS_API_KEY = process.env.ODDS_API_KEY || '023f42ef331e0ee20d09bef3c6dba39c';
+
+// HTML Template - wird direkt vom Server serviert
+const getHTML = () => `
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WM 2026 Wett-Analyzer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 2.5em;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 20px;
+      gap: 15px;
+    }
+
+    .status {
+      background: #f0f0f0;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 0.95em;
+      flex: 1;
+      text-align: center;
+    }
+
+    .status.success {
+      color: #28a745;
+    }
+
+    .status.loading {
+      color: #ffc107;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    @media (max-width: 900px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .card h2 {
+      color: #667eea;
+      margin-bottom: 20px;
+      font-size: 1.5em;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 10px;
+    }
+
+    .match {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      border-left: 4px solid #667eea;
+    }
+
+    .match-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .teams {
+      font-size: 1.1em;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .date {
+      color: #666;
+      font-size: 0.9em;
+    }
+
+    .odds-container {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .odd-button {
+      flex: 1;
+      padding: 10px;
+      border: 2px solid #ddd;
+      background: white;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.3s ease;
+      font-weight: 600;
+    }
+
+    .odd-button:hover {
+      border-color: #667eea;
+      transform: scale(1.05);
+    }
+
+    .odd-button.selected {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+
+    .odd-label {
+      font-size: 0.85em;
+      opacity: 0.8;
+      margin-bottom: 3px;
+    }
+
+    .odd-value {
+      font-size: 1.2em;
+    }
+
+    .analyze-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 10px;
+      font-size: 1.1em;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 20px;
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+      transition: all 0.3s ease;
+    }
+
+    .analyze-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 7px 20px rgba(102, 126, 234, 0.6);
+    }
+
+    .analyze-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .loading-message {
+      text-align: center;
+      padding: 40px;
+      color: #667eea;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .results {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 20px;
+      margin-top: 30px;
+    }
+
+    .tip-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 15px;
+      padding: 20px;
+    }
+
+    .tip-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      border-bottom: 2px solid rgba(255,255,255,0.2);
+      padding-bottom: 10px;
+    }
+
+    .confidence-badge {
+      background: rgba(255,255,255,0.3);
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 0.9em;
+    }
+
+    .tip-match {
+      font-size: 1.3em;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .tip-reasoning {
+      font-size: 0.95em;
+      line-height: 1.6;
+      opacity: 0.95;
+    }
+
+    .error-message {
+      background: #f8d7da;
+      border: 2px solid #f5c6cb;
+      color: #721c24;
+      padding: 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+    }
+
+    .info-message {
+      background: #d1ecf1;
+      border: 2px solid #bee5eb;
+      color: #0c5460;
+      padding: 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+    }
+
+    .setting-group {
+      margin-bottom: 15px;
+    }
+
+    .setting-group label {
+      display: block;
+      color: #666;
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+
+    .setting-group select {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 1em;
+    }
+
+    .no-matches {
+      text-align: center;
+      color: #999;
+      padding: 30px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>⚽ WM 2026 Wett-Analyzer</h1>
+      <p>Live-Spiele und intelligente Wetttipp-Analyse</p>
+      
+      <div class="status-bar">
+        <div class="status success" id="apiStatus">
+          ✓ Server online
+        </div>
+        <div class="status success" id="quoteStatus">
+          ✓ Quoten-Generator aktiv
+        </div>
+      </div>
+    </div>
+
+    <div class="main-grid">
+      <div class="card">
+        <h2>⚙️ Einstellungen</h2>
+        
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+          <div class="setting-group">
+            <label>Wettbewerb:</label>
+            <select id="competitionSelect">
+              <option value="">-- Bitte wählen --</option>
+              <option value="WC">🌍 FIFA Weltmeisterschaft 2026</option>
+              <option value="PL">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
+              <option value="BL1">🇩🇪 Bundesliga</option>
+              <option value="SA">🇮🇹 Serie A</option>
+              <option value="PD">🇪🇸 La Liga</option>
+            </select>
+          </div>
+
+          <button class="analyze-btn" onclick="loadMatches()" style="margin-top: 0;">
+            🔄 Spiele laden
+          </button>
+        </div>
+
+        <h2 style="margin-top: 30px;">🎯 Verfügbare Spiele</h2>
+        <div id="matches-container">
+          <div class="no-matches">
+            <p>Wähle einen Wettbewerb und klick "Spiele laden"</p>
+          </div>
+        </div>
+        
+        <button class="analyze-btn" onclick="analyzeMatches()" id="analyzeBtn" disabled>
+          🤖 Analysiere Wetten
+        </button>
+      </div>
+
+      <div class="card">
+        <h2>📊 Info & Anleitung</h2>
+        <div class="info-message">
+          <h3>🎯 So funktioniert es:</h3>
+          <p style="margin: 15px 0;">
+            <strong>1.</strong> Wähle einen Wettbewerb<br><br>
+            <strong>2.</strong> Klick "Spiele laden"<br><br>
+            <strong>3.</strong> Wähle deine Wetten aus<br><br>
+            <strong>4.</strong> Klick "Analysiere Wetten"<br><br>
+            <strong>5.</strong> Erhalte intelligente Tipps!
+          </p>
+        </div>
+
+        <div style="background: #d1ecf1; border: 2px solid #bee5eb; color: #0c5460; padding: 20px; border-radius: 10px; margin-top: 20px;">
+          <h3 style="color: #0c5460;">📡 Live-Datenquellen</h3>
+          <p style="margin: 15px 0;">
+            <strong>Football-Data.org:</strong><br>
+            ✓ Aktuelle Spiele<br>
+            ✓ Team-Statistiken<br>
+            ✓ Spielstände live<br>
+            ✓ 100% kostenlos
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div id="results" class="hidden">
+      <h2 style="color: white; margin: 40px 20px 20px 0; font-size: 2em;">💡 Deine Wetttipps</h2>
+      <div class="results" id="tips-container"></div>
+    </div>
+  </div>
+
+  <script>
+    let allMatches = [];
+    let selectedBets = {};
+
+    async function loadMatches() {
+      const competition = document.getElementById('competitionSelect').value;
+
+      if (!competition) {
+        alert('Bitte einen Wettbewerb wählen!');
+        return;
+      }
+
+      document.getElementById('apiStatus').textContent = '⏳ Lade Spiele...';
+      document.getElementById('apiStatus').className = 'status loading';
+
+      try {
+        const response = await fetch(\`/api/matches?competition=\${competition}\`);
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Unbekannter Fehler');
+        }
+
+        allMatches = data.matches;
+        selectedBets = {};
+        displayMatches(data.matches);
+        document.getElementById('apiStatus').textContent = \`✓ \${data.matches.length} Spiele geladen\`;
+        document.getElementById('apiStatus').className = 'status success';
+
+      } catch (error) {
+        console.error('Fehler:', error);
+        document.getElementById('apiStatus').textContent = '✗ Fehler beim Laden';
+        document.getElementById('apiStatus').className = 'status';
+        document.getElementById('matches-container').innerHTML = \`
+          <div class="error-message">
+            <strong>Fehler:</strong> \${error.message}
+          </div>
+        \`;
+      }
+    }
+
+    function displayMatches(matches) {
+      const container = document.getElementById('matches-container');
+      
+      if (matches.length === 0) {
+        container.innerHTML = '<div class="no-matches"><p>Keine Spiele verfügbar</p></div>';
+        return;
+      }
+
+      container.innerHTML = matches.map(m => \`
+        <div class="match">
+          <div class="match-header">
+            <div>
+              <div class="teams">\${m.home} vs \${m.away}</div>
+              <div class="date">\${m.date}</div>
+            </div>
+          </div>
+          <div class="odds-container">
+            <button class="odd-button" onclick="toggleBet(\${m.id}, 'home', this)">
+              <div class="odd-label">Heim</div>
+              <div class="odd-value">\${m.odds.home.toFixed(2)}</div>
+            </button>
+            <button class="odd-button" onclick="toggleBet(\${m.id}, 'draw', this)">
+              <div class="odd-label">X</div>
+              <div class="odd-value">\${m.odds.draw.toFixed(2)}</div>
+            </button>
+            <button class="odd-button" onclick="toggleBet(\${m.id}, 'away', this)">
+              <div class="odd-label">Aus</div>
+              <div class="odd-value">\${m.odds.away.toFixed(2)}</div>
+            </button>
+          </div>
+        </div>
+      \`).join('');
+    }
+
+    function toggleBet(matchId, betType, btn) {
+      btn.parentElement.querySelectorAll('.odd-button').forEach(b => b.classList.remove('selected'));
+      
+      if (selectedBets[matchId] === betType) {
+        delete selectedBets[matchId];
+      } else {
+        selectedBets[matchId] = betType;
+        btn.classList.add('selected');
+      }
+
+      const btn2 = document.getElementById('analyzeBtn');
+      btn2.disabled = Object.keys(selectedBets).length === 0;
+    }
+
+    async function analyzeMatches() {
+      if (Object.keys(selectedBets).length === 0) return;
+
+      const selectedMatches = allMatches.filter(m => selectedBets[m.id]);
+
+      try {
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            matches: selectedMatches,
+            bets: selectedBets
+          })
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error);
+        }
+
+        displayResults(data.tips);
+        document.getElementById('results').classList.remove('hidden');
+        window.scrollTo(0, document.getElementById('results').offsetTop - 100);
+
+      } catch (error) {
+        alert('Fehler bei der Analyse: ' + error.message);
+      }
+    }
+
+    function displayResults(tips) {
+      const tipsHTML = tips.map(tip => \`
+        <div class="tip-card">
+          <div class="tip-header">
+            <span>\${tip.prediction}</span>
+            <span class="confidence-badge">\${tip.confidence}%</span>
+          </div>
+          <div class="tip-match">\${tip.match}</div>
+          <div class="tip-reasoning">\${tip.reasoning}</div>
+        </div>
+      \`).join('');
+
+      document.getElementById('tips-container').innerHTML = tipsHTML;
+    }
+  </script>
+</body>
+</html>
+`;
 
 // Health Check
 app.get('/health', (req, res) => {
@@ -55,40 +569,13 @@ app.get('/api/matches', async (req, res) => {
 
     res.json({ success: true, matches });
   } catch (error) {
-    console.error('Fehler beim Laden der Matches:', error.message);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message
-    });
-  }
-});
-
-// API: Quoten laden
-app.get('/api/odds', async (req, res) => {
-  try {
-    const { sport } = req.query;
-
-    if (!sport) {
-      return res.status(400).json({ error: 'Sport erforderlich' });
-    }
-
-    const response = await axios.get(
-      `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h`,
-      { timeout: 10000 }
-    );
-
-    res.json({ success: true, odds: response.data.data });
-  } catch (error) {
-    console.error('Fehler beim Laden der Quoten:', error.message);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
+    console.error('Fehler:', error.message);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 // API: Analyse
-app.post('/api/analyze', async (req, res) => {
+app.post('/api/analyze', (req, res) => {
   try {
     const { matches, bets } = req.body;
 
@@ -109,46 +596,23 @@ app.post('/api/analyze', async (req, res) => {
       });
     }
 
-    const combos = generateCombinations(tips);
-
-    res.json({ success: true, tips, combos });
+    res.json({ success: true, tips, combos: [] });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Serve HTML für Root
+// Serve HTML
 app.get('/', (req, res) => {
-  const htmlPath = path.join(__dirname, 'wm-analyzer-with-backend.html');
-  
-  if (fs.existsSync(htmlPath)) {
-    res.sendFile(htmlPath);
-  } else {
-    res.status(404).json({ 
-      error: 'HTML Datei nicht gefunden',
-      looking_for: htmlPath,
-      current_dir: __dirname
-    });
-  }
+  res.send(getHTML());
 });
 
-// Fallback für alle anderen Routes → HTML
+// Fallback
 app.get('*', (req, res) => {
-  // Ignoriere API und statische Dateien
   if (req.path.startsWith('/api')) {
     return res.status(404).json({ error: 'API Endpoint nicht gefunden' });
   }
-  
-  const htmlPath = path.join(__dirname, 'wm-analyzer-with-backend.html');
-  
-  if (fs.existsSync(htmlPath)) {
-    res.sendFile(htmlPath);
-  } else {
-    res.status(404).json({ 
-      error: 'HTML Datei nicht gefunden',
-      path: req.path
-    });
-  }
+  res.send(getHTML());
 });
 
 // Hilfsfunktionen
@@ -216,47 +680,10 @@ function getPredictionText(type) {
   return texts[type];
 }
 
-function generateCombinations(tips) {
-  const combos = [];
-
-  if (tips.length >= 2) {
-    const combo2 = tips.slice(0, 2);
-    const odds2 = combo2.reduce((acc, t) => acc * t.odds, 1).toFixed(2);
-    const conf2 = Math.round(combo2.reduce((acc, t) => acc + t.confidence, 0) / combo2.length);
-    
-    combos.push({
-      bets: combo2.map(t => `${t.match}: ${t.prediction}`),
-      odds: odds2,
-      confidence: conf2,
-      expectedReturn: `Bei 100€: ${(100 * odds2).toFixed(0)}€`
-    });
-  }
-
-  if (tips.length >= 3) {
-    const combo3 = tips.slice(0, 3);
-    const odds3 = combo3.reduce((acc, t) => acc * t.odds, 1).toFixed(2);
-    const conf3 = Math.round(combo3.reduce((acc, t) => acc + t.confidence, 0) / combo3.length);
-    
-    combos.push({
-      bets: combo3.map(t => `${t.match}: ${t.prediction}`),
-      odds: odds3,
-      confidence: conf3,
-      expectedReturn: `Bei 100€: ${(100 * odds3).toFixed(0)}€`
-    });
-  }
-
-  return combos;
-}
-
 // Server starten
-const server = app.listen(PORT, () => {
-  console.log(`🚀 WM Wett-Analyzer Server läuft auf Port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`🚀 WM Wett-Analyzer läuft auf Port ${PORT}`);
   console.log(`📍 URL: http://localhost:${PORT}`);
-  console.log(`\n✓ API Endpoints verfügbar`);
 });
 
-// Graceful Shutdown
-process.on('SIGTERM', () => {
-  console.log('Server wird heruntergefahren...');
-  server.close();
-});
+module.exports = app;
